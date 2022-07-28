@@ -1,3 +1,5 @@
+from collections.abc import Hashable
+
 class HashTable:
     """
     Ordered Hash table using Robin Hood hashing. 
@@ -9,7 +11,7 @@ class HashTable:
         self.size = 0
         self.items = DLList()
 
-    def insert(self, key, value):
+    def _insert(self, key, value):
         """Safe insertion (checks table capacity and packs an item into a HashedItem object)."""
         self.size += 1
         if self.size / self.capacity > 0.9:
@@ -49,7 +51,7 @@ class HashTable:
             if item is not None:
                 self.__dangerous_insert(item, reinsertion=True)
  
-    def delete(self, idx):
+    def _delete(self, idx):
         """Delete item using backwards shift technique.""" 
         self.size -= 1
         self.items.delete_node(self.table[idx])
@@ -63,7 +65,7 @@ class HashTable:
                 self.table[prev] = self.table[idx]
                 self.table[prev].item.probe -= 1
 
-    def find(self, key):
+    def _find(self, key):
         """Find item using linear probing (could be improved with smart probing)."""
         table = self.table
         idx = hash(key)
@@ -73,13 +75,66 @@ class HashTable:
             if not table[idx]:
                 return None
             elif table[idx].item.key == key:
-                return table[idx].item.value
+                return idx, table[idx].item.value
             elif table[idx].item.probe < probe:
                 return None
             else:
                 idx += 1
                 probe +=1
 
+    def pop(self, key):
+        """Finds, deletes, and returns the item associated with the key."""
+        if not self.__hashable(key):
+            raise TypeError(f"unhashable type: {type(key).__name__}")
+        if (result := self._find(key)) is not None:
+            self._delete(result[0])
+            return result[1]
+        else:
+            raise KeyError(key)
+
+    def __hashable(self, key):
+        return isinstance(key, Hashable)
+
+    def __len__(self):
+        return self.size
+
+    def __contains__(self, key):
+        """Returns boolean representing whether the key is in the table or not."""
+        if not self.__hashable(key):
+            raise TypeError(f"unhashable type: {type(key).__name__}")
+        if self._find(key) is not None:
+            return True
+        else:
+            return False
+
+    def __getitem__(self, key):
+        """Finds and returns item associated with key."""
+        if not self.__hashable(key):
+            raise TypeError(f"unhashable type: {type(key).__name__}")
+        if (result := self._find(key)) is not None:
+            return result[1]
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        """Inserts a new item into the table."""
+        if not self.__hashable(key):
+            raise TypeError(f"unhashable type: {type(key).__name__}")
+        self._insert(key, value)
+    
+    def __delitem__(self, key):
+        """Delete item from table."""
+        if not self.__hashable(key):
+            raise TypeError(f"unhashable type: {type(key).__name__}")
+        if (result := self._find(key)) is not None:
+            self._delete(result[0])
+        else:
+            raise KeyError(key)
+
+    def __iter__(self):
+        """Yields an iterable for all keys in table."""
+        for node in self.items:
+            yield node.item.key
 
     class HashedItem:
         """Local class for wrapping a hash table value."""
