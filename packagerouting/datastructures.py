@@ -1,4 +1,8 @@
+import time
+from typing import List
 from collections.abc import Hashable
+from collections import defaultdict
+
 
 class HashTable:
     """
@@ -186,3 +190,65 @@ class DLList:
             self.item = item
             self.prev = None
             self.next = None
+
+
+class Graph:
+    """Graph class used for calculating shortest routes using Floyd-Warshall all pairs shortest path algorithm."""
+    def __init__(self):
+        self.nodes = {}
+        self.adj = defaultdict(lambda:defaultdict(lambda:float('inf')))
+        self.paths = defaultdict(dict)
+        self.valid = False
+
+    def add_node(self, *nodes):
+        """Inserts a node into the list of nodes."""
+        for v in nodes:
+            self.nodes[v] = time.time_ns()  # Touched time
+
+    def add_edge(self, n1, n2, weight):
+        """Adds edges and initial path between two nodes with a given weight."""
+        self.valid = False
+        self.adj[n1][n2] = weight
+        self.adj[n2][n1] = weight
+        self.add_node(n1, n2)
+    
+    def calculate_shortest_paths(self):
+        """Floyd-Warshall algorithm."""
+        paths = self.paths
+        nodes = self.nodes
+        # Add initial adjacency for path finding
+        for n1 in nodes:
+            for n2 in nodes:
+                if n1 == n2:
+                    paths[n1][n2] = Graph.Path(0)
+                else:
+                    paths[n1][n2] = Graph.Path(self.adj[n1][n2], [n1, n2])
+        # Find shortest paths using dynamic programming
+        for i in nodes:
+            for n1 in nodes:
+                for n2 in nodes:
+                    test_weight = paths[n1][i].weight + paths[i][n2].weight
+                    if test_weight < paths[n1][n2].weight:
+                        # Change path
+                        paths[n1][n2] = Graph.Path(test_weight, [*paths[n1][i].nodes, *paths[i][n2].nodes[1:]])
+        self.valid = True
+        
+    def get_dist(self, start, end):
+        """Returns the shortest path between two points, checks if shortest paths are valid or need to be recomputed."""
+        if not self.valid:
+            self.calculate_shortest_paths()
+        return self.paths[start][end]
+
+
+    class Path:
+        """Class for storing a computed path of nodes."""
+        def __init__(self, weight: float = 0, nodes: List = []):
+            self.weight: float = weight
+            self.nodes = nodes
+            self.created = time.time_ns()
+
+        def __lt__(self, other):
+            return self.weight < other.weight
+        
+        def __repr__(self):
+            return f"Weight: {self.weight} Path: {' -> '.join([n for n in self.nodes])}"
