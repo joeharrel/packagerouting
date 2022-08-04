@@ -220,11 +220,119 @@ def run_sim(target_time: datetime = END_OF_DAY):
                         item["package"].status = (Status.DELAYED, item["package"].constraints[Constraint.DELAYED])
 
 
-def user_interface():
-    run_sim()
+def print_miles():
+    """Print truck mileage."""
+    global routes, trucks
+    if routes is None or trucks is None:    # Sim hasn't been run yet
+        run_sim()
+    for truck in trucks:
+        truck.mileage = 0
+    for route in routes:
+        route["truck"].mileage += route["total_distance"]
+    total_miles = 0
+    for truck in trucks:
+        print(f"Truck {truck.id} traveled {truck.mileage} miles")
+        total_miles += truck.mileage
+    print(f"Total: {total_miles} miles")    
+
+
+def print_packages(package_id: str = None):
+    """Print all packages."""
+    if package_id is not None:
+        pretty_print(package_table[package_id])
+        return
     for id in package_table:
-        package = package_table[id]
-        print(f"{package.id} {package.status}")
+        pretty_print(package_table[id], oneline=True)
+
+
+def pretty_print(package: Package, oneline: bool = False):
+    """Print a single package in a pretty format."""
+    end = " " if oneline else "\n"
+    color = "\033[7m " if oneline else ""
+    stop = " \033[0m" if oneline else ""
+    location = location_dict[package.location_id]
+    print(f"----Package ID: {package.id}----", end=end)
+    print(f"{color}Weight: {package.mass}{stop}", end=end)
+    print(f"Address: {location['Address']}, {location['City']}, {location['State']} {location['Zip']}", end=end)
+    print(f"{color}Deadline: {package.deadline.strftime('%Y-%m-%d %I:%M:%S %p') if package.deadline != END_OF_DAY else date.today().strftime('%Y-%m-%d') + ' EOD'}{stop}", end=end)
+    if package.status[0] == Status.DELIVERED:
+        status = f"Delivered: {package.status[1].strftime('%Y-%m-%d %I:%M:%S %p')}"
+    elif package.status[0] == Status.DELAYED:
+        status = f"Delayed until {package.status[1].strftime('%Y-%m-%d %I:%M:%S %p')}"
+    elif package.status[0] == Status.EN_ROUTE:
+        status = f"En route on Truck {package.status[1].id}"
+    elif package.status[0] == Status.AT_HUB:
+        status = "Currently waiting at Hub"
+    print(status)
+
+
+def user_interface():
+    """Displays the user interface and handles input parsing."""
+    print("-------------------------------------------")
+    print("----------Package Routing Program----------")
+    print("-------------------------------------------")
+    def menu():
+        print("    menu               Display this menu")
+        print("    time <time>        Set simulation time using military or standard format")
+        print("    package <id>       Retrieve package information for a specific package")
+        print("    all                Retrieve package information for all packages")
+        print("    miles              Retrieve total mileage for all trucks")
+        print("    exit               Exit the program at any point")
+
+    menu()
+    time = None
+    while True:
+        res = input().lower().split(' ', 1)
+        if len(res) == 0:
+            pass
+        elif res[0] == "exit":
+            break
+        elif res[0] == 'miles':
+            print_miles()
+        elif res[0] == 'all':
+            if time is None:
+                print("Time not specified, using end of day.")
+                run_sim()
+            print(f"At {time or END_OF_DAY}:")
+            print_packages()
+        elif res[0] == 'package':
+            if len(res) == 1:
+                print("'package' command requires an argument ex: 'package 1'")
+            else:
+                if res[1] not in package_table:
+                    print(f"ID '{res[1]}' not found.")
+                    continue
+                if time is None:
+                    print("Time not specified using end of day.")
+                    run_sim()
+                print(f"At {time or END_OF_DAY}:")
+                print_packages(res[1])
+        elif res[0] == "time":
+            if len(res) == 1:
+                print("'time' command requires an argument ex: 'time 10:30am'")
+            else:
+                if meridiem:= re.search(r"([a|p]m)", res[1]):
+                    if timematch := re.match(r"^((?:0?[1-9]|1[0-2])?:[0-5][0-9])(?:\s*([a|p]m))$", res[1]):
+                        timestr = f"{timematch.group(1)} {meridiem.group(0)}"
+                else:
+                    if timematch:= re.match(r"^((?:[0-1]?[0-9]|2[0-3]):[0-5][0-9])$", res[1]):
+                        timestr = f"{timematch.group(1)}"
+                if not timematch:
+                    print("Invalid format. Usage ex: 'time 10:30am'")
+                else:
+                    try:
+                        target_time = parse_time(timestr, not meridiem)
+                    except:
+                        print("Error parsing time.")
+                    else:
+                        print(f"Time set to {target_time}.")
+                        if target_time != time:
+                            run_sim(target_time)
+                            time = target_time
+        elif res[0] == "menu":
+            menu()
+        else:
+            print("Invalid command. 'menu' to see options.")
 
 
 def main():
